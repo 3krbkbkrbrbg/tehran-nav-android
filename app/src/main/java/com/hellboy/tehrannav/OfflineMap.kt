@@ -36,9 +36,7 @@ class OfflineMap(
                     object : CacheManager.CacheManagerCallback {
                         override fun downloadStarted() {}
                         override fun setPossibleTilesInArea(total: Int) {}
-                        override fun onTaskFailed() {
-                            listener?.onFinished(false, count)
-                        }
+                        override fun onTaskFailed() {}
                         override fun updateProgress(progress: Int, currentZoomLevel: Int, zoomMin: Int, zoomMax: Int) {
                             listener?.onProgress(progress, total)
                         }
