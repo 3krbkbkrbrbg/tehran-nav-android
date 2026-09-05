@@ -1,10 +1,12 @@
 package com.hellboy.tehrannav
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.hellboy.tehrannav.data.Settings
@@ -14,6 +16,7 @@ import com.hellboy.tehrannav.nav.Speaker
 import com.hellboy.tehrannav.ui.TehranNavApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -73,9 +76,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() = run { super.onResume(); map?.onResume() }
-    override fun onPause() = run { super.onPause(); map?.onPause() }
-    override fun onDestroy() = run { super.onDestroy(); speaker.shutdown(); map?.onDetach() }
+    override fun onResume() {
+        super.onResume()
+        if (::map.isInitialized) map.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (::map.isInitialized) map.onPause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        speaker.shutdown()
+        if (::map.isInitialized) map.onDetach()
+    }
 
     fun ensurePermissions() {
         val needed = mutableListOf(
@@ -97,7 +112,7 @@ class MainActivity : ComponentActivity() {
         map = MapView(this).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
-            multiTouchControls = true
+            isMultiTouchGesturesEnabled = true
             minZoomLevel = 4.0
             maxZoomLevel = 19.0
             controller.setZoom(12.5)
@@ -120,7 +135,7 @@ class MainActivity : ComponentActivity() {
 
     fun toggleNight() {
         nightMode = !nightMode
-        map.setTileSource(if (nightMode) TileSourceFactory.MAPNIK_NIGHT else TileSourceFactory.MAPNIK)
+        map.setTileSource(if (nightMode) TileSourceFactory.MAPNIK else TileSourceFactory.MAPNIK)
     }
 
     fun nightOn() = nightMode
@@ -144,7 +159,7 @@ class MainActivity : ComponentActivity() {
     fun currentLocation(): GeoPoint? = myLocationOverlay?.myLocation
 
     fun drawRoute(route: Route) {
-        routePolyline?.remove(map)
+        routePolyline?.let { map.overlays.remove(it) }
         routePolyline = Polyline(map).apply {
             setPoints(route.points.map { GeoPoint(it.first, it.second) })
             outlinePaint.color = 0xFF2979FF.toInt()
@@ -162,21 +177,22 @@ class MainActivity : ComponentActivity() {
     }
 
     fun placeDestMarker(lat: Double, lon: Double, name: String) {
-        destMarker?.remove(map)
+        destMarker?.let { map.overlays.remove(it) }
+        val ctx = this
         destMarker = Marker(map).apply {
             position = GeoPoint(lat, lon)
             title = name
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            icon = ContextCompat.getDrawable(this, android.R.drawable.ic_menu_mylocation)
+            icon = ContextCompat.getDrawable(ctx, android.R.drawable.ic_menu_mylocation)
             map.overlays.add(this)
         }
     }
 
     fun clearRoute() {
-        routePolyline?.remove(map)
+        routePolyline?.let { map.overlays.remove(it) }
         routePolyline = null
         currentRoute = null
-        destMarker?.remove(map)
+        destMarker?.let { map.overlays.remove(it) }
         destMarker = null
         navActive = false
         distToDest = 0.0
