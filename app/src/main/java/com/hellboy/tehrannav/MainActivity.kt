@@ -144,7 +144,7 @@ class MainActivity : ComponentActivity() {
         map.overlays.add(object : org.osmdroid.views.overlay.Overlay() {
             override fun onSingleTapConfirmed(e: android.view.MotionEvent?, mapView: MapView?): Boolean {
                 if (e != null) {
-                    val p = mapView?.projection?.fromPixels(e.x.toDouble(), e.y.toDouble())
+                    val p = mapView?.projection?.fromPixels(e.x.toInt(), e.y.toInt())
                     if (p != null) {
                         coordReadout = "%.6f, %.6f".format(p.latitude, p.longitude)
                     }
