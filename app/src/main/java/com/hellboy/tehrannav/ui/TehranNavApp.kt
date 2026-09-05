@@ -176,7 +176,7 @@ fun TehranNavApp(activity: MainActivity) {
                 // destination info card above AI bar
                 if (state.destName.isNotEmpty() && !activity.navActive) {
                     DestInfoCard(
-                        vm, state,
+                        vm, state, activity,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 92.dp, start = 12.dp, end = 12.dp)

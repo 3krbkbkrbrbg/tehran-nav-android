@@ -85,6 +85,10 @@ class TehranNavViewModel(app: Application) : AndroidViewModel(app) {
         state = state.copy(showSettings = v)
     }
 
+    fun saveApiKey(key: String) {
+        settings.geminiApiKey = key
+    }
+
     fun setShowOffline(v: Boolean) {
         state = state.copy(showOffline = v)
     }
