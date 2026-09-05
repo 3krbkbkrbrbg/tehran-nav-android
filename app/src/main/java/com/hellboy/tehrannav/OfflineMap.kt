@@ -31,22 +31,14 @@ class OfflineMap(
                     val east = ((bbox.lonEast + 180.0) / 360.0 * n).toInt()
                     total += ((east - west + 1) * (north - south + 1)).toInt()
                 }
-                var failed = false
                 manager.downloadAreaAsync(
                     ctx, bbox, minZ, maxZ,
                     object : CacheManager.CacheManagerCallback {
-                        override fun updateProgress(progress: Int, currentZoomLevel: Int, zoomMin: Int, zoomMax: Int): Boolean {
+                        override fun updateProgress(progress: Int, currentZoomLevel: Int, zoomMin: Int, zoomMax: Int) {
                             listener?.onProgress(progress, total)
-                            return true
                         }
-                        override fun onTaskComplete(): Boolean {
-                            listener?.onFinished(!failed, count)
-                            return true
-                        }
-                        override fun onTaskFailed(): Boolean {
-                            failed = true
-                            listener?.onFinished(false, count)
-                            return false
+                        override fun onTaskComplete() {
+                            listener?.onFinished(true, count)
                         }
                     }
                 )
