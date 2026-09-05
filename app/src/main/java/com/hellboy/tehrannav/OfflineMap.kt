@@ -35,15 +35,18 @@ class OfflineMap(
                 manager.downloadAreaAsync(
                     ctx, bbox, minZ, maxZ,
                     object : CacheManager.CacheManagerCallback {
-                        override fun updateProgress(progress: Int, currentZoomLevel: Int, zoomMin: Int, zoomMax: Int) {
+                        override fun updateProgress(progress: Int, currentZoomLevel: Int, zoomMin: Int, zoomMax: Int): Boolean {
                             listener?.onProgress(progress, total)
+                            return true
                         }
-                        override fun onTaskComplete() {
+                        override fun onTaskComplete(): Boolean {
                             listener?.onFinished(!failed, count)
+                            return true
                         }
-                        override fun onTaskFailed() {
+                        override fun onTaskFailed(): Boolean {
                             failed = true
                             listener?.onFinished(false, count)
+                            return false
                         }
                     }
                 )
