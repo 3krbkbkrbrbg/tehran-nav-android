@@ -1,6 +1,7 @@
 package com.hellboy.tehrannav
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -197,11 +198,20 @@ class MainActivity : ComponentActivity() {
         val first = currentRoute?.steps?.firstOrNull()?.instruction
             ?: "به سمت مقصد حرکت کنید"
         speaker.speak(first, settings.ttsEnabled)
+        // foreground service keeps nav alive in background
+        if (Build.VERSION.SDK_INT >= 26) {
+            startForegroundService(
+                Intent(this, NavService::class.java)
+            )
+        } else {
+            startService(Intent(this, NavService::class.java))
+        }
     }
 
     fun stopNav() {
         navActive = false
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        stopService(Intent(this, NavService::class.java))
         speaker.stop()
     }
 
