@@ -6,14 +6,6 @@ import android.content.Context
 class Settings(context: Context) {
     private val prefs = context.getSharedPreferences("tehran_nav", Context.MODE_PRIVATE)
 
-    var geminiApiKey: String
-        get() = prefs.getString("gemini_api_key", "").orEmpty()
-        set(value) { prefs.edit().putString("gemini_api_key", value).apply() }
-
-    var aiModel: String
-        get() = prefs.getString("ai_model", "gemini-2.0-flash").orEmpty()
-        set(value) { prefs.edit().putString("ai_model", value).apply() }
-
     var ttsEnabled: Boolean
         get() = prefs.getBoolean("tts_enabled", true)
         set(value) { prefs.edit().putBoolean("tts_enabled", value).apply() }

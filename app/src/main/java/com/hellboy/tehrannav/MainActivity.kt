@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.media3.common.Player
 import android.widget.Toast
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -76,6 +77,9 @@ class MainActivity : ComponentActivity() {
     var lastLocation: GeoPoint? = null
         private set
 
+    var radioPlayer: Player? = null
+        private set
+
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
@@ -88,6 +92,11 @@ class MainActivity : ComponentActivity() {
 
         // ask for location right away on every cold start (first install and each re-entry)
         ensurePermissions()
+
+        val controllerFuture = MediaControllerProvider.connect(applicationContext)
+        controllerFuture.addListener({
+            radioPlayer = runCatching { controllerFuture.get() }.getOrNull()
+        }, ContextCompat.getMainExecutor(this))
 
         setContent {
             TehranNavApp(activity = this)

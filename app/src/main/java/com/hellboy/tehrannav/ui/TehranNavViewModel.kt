@@ -6,7 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.hellboy.tehrannav.ai.GeminiClient
 import com.hellboy.tehrannav.data.Settings
 import com.hellboy.tehrannav.nav.NavEngine
 import com.hellboy.tehrannav.nav.PlaceSearch
@@ -20,18 +19,12 @@ data class UiState(
     val searchQuery: String = "",
     val searchResults: List<PlaceSearch.Place> = emptyList(),
     val searching: Boolean = false,
-    val aiQuery: String = "",
-    val aiLoading: Boolean = false,
-    val aiResult: String = "",
-    val aiInstructions: List<String> = emptyList(),
-    val aiSummary: String = "",
     val destName: String = "",
     val destLat: Double = 0.0,
     val destLon: Double = 0.0,
     val distance: String = "",
     val time: String = "",
     val guidance: String = "",
-    val showSettings: Boolean = false,
     val showOffline: Boolean = false,
     val showCoords: Boolean = false
 )
@@ -81,24 +74,12 @@ class TehranNavViewModel(app: Application) : AndroidViewModel(app) {
         state = state.copy(searchResults = emptyList())
     }
 
-    fun setShowSettings(v: Boolean) {
-        state = state.copy(showSettings = v)
-    }
-
-    fun saveApiKey(key: String) {
-        settings.geminiApiKey = key
-    }
-
     fun setShowOffline(v: Boolean) {
         state = state.copy(showOffline = v)
     }
 
     fun setShowCoords(v: Boolean) {
         state = state.copy(showCoords = v)
-    }
-
-    fun onAiType(q: String) {
-        state = state.copy(aiQuery = q)
     }
 
     // ---------- destination & routing ----------
@@ -115,7 +96,7 @@ class TehranNavViewModel(app: Application) : AndroidViewModel(app) {
 
     fun computeRoute(toLat: Double, toLon: Double, name: String) {
         viewModelScope.launch {
-            state = state.copy(searching = true, aiLoading = false, aiResult = "")
+            state = state.copy(searching = true)
             val from = host?.currentLocation() ?: GeoPoint(35.6892, 51.3890)
             NavEngine.route(from.latitude, from.longitude, toLat, toLon).fold(
                 onSuccess = { route ->
@@ -129,96 +110,11 @@ class TehranNavViewModel(app: Application) : AndroidViewModel(app) {
                     )
                     host?.drawRoute(route)
                     host?.zoomToRoute(route)
-                    if (GeminiClient.isConfigured(settings)) {
-                        aiAdvice(name, route)
-                    }
                 },
                 onFailure = {
                     state = state.copy(searching = false, guidance = "خطا در محاسبه مسیر: ${it.message}")
                 }
             )
-        }
-    }
-
-    private fun aiAdvice(destName: String, route: Route) {
-        viewModelScope.launch {
-            state = state.copy(aiLoading = true)
-            val advice = GeminiClient.routeAdvice(destName, routeText(route), settings)
-            state = state.copy(aiLoading = false)
-            if (advice != null) {
-                state = state.copy(
-                    aiSummary = advice.summary,
-                    aiInstructions = advice.directions,
-                    aiResult = buildString {
-                        append(advice.summary)
-                        advice.directions.forEach { append("\n• ").append(it) }
-                    }
-                )
-                host?.speak(advice.summary)
-            }
-        }
-    }
-
-    private fun routeText(route: Route): String {
-        val sb = StringBuilder()
-        sb.append("مسیر کل: ${NavEngine.formatDistance(route.totalDistance)}، مدت: ${NavEngine.formatDuration(route.totalDuration)}\n")
-        route.steps.forEach { sb.append("- ").append(it.instruction).append(" («").append(it.street).append(") ").append(NavEngine.formatDistance(it.distance)).append("\n") }
-        return sb.toString()
-    }
-
-    // ---------- AI natural language ----------
-    fun sendAiCommand(text: String) {
-        if (text.isBlank()) return
-        state = state.copy(aiQuery = "", aiLoading = true, aiResult = "")
-        viewModelScope.launch {
-            val dest = if (GeminiClient.isConfigured(settings)) {
-                GeminiClient.parseDestination(text, settings)
-            } else {
-                NavEngine.parseDestinationFallback(text)
-            }
-            if (dest.isBlank()) {
-                state = state.copy(
-                    aiLoading = false,
-                    aiResult = "مقصدی در جمله پیدا نشد. مثلاً: «برو میدان آزادی» یا «مسیر فرودگاه مهرآباد»"
-                )
-                return@launch
-            }
-            // geocode the destination
-            val places = PlaceSearch.search(dest)
-            if (places.isEmpty()) {
-                state = state.copy(aiLoading = false, aiResult = "مقصد «$dest» پیدا نشد. نام دقیق‌تری بگویید.")
-                return@launch
-            }
-            val place = places.first()
-            state = state.copy(aiLoading = false)
-            pickDestination(place.name, place.lat, place.lon)
-        }
-    }
-
-    // ---------- AI chat with context ----------
-    private var chatHistory = mutableListOf<Pair<String, String>>()
-
-    fun aiChat(msg: String) {
-        if (msg.isBlank()) return
-        state = state.copy(aiQuery = "", aiLoading = true)
-        chatHistory.add("user" to msg)
-        viewModelScope.launch {
-            val dest = GeminiClient.parseDestination(msg, settings)
-            if (dest.isNotBlank()) {
-                val places = PlaceSearch.search(dest)
-                if (places.isNotEmpty()) {
-                    val p = places.first()
-                    chatHistory.add("ai" to "مقصد «${p.name}» انتخاب شد.")
-                    pickDestination(p.name, p.lat, p.lon)
-                    return@launch
-                }
-            }
-            // free-form answer without routing
-            val answer = GeminiClient.chat(
-                msg, history = chatHistory.takeLast(20).map { it.first to it.second }, settings
-            )
-            chatHistory.add("ai" to answer)
-            state = state.copy(aiLoading = false, aiResult = answer)
         }
     }
 
@@ -232,14 +128,14 @@ class TehranNavViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun clearAll() {
-        state = state.copy(destName = "", distance = "", time = "", guidance = "", aiResult = "", aiInstructions = emptyList())
+        state = state.copy(destName = "", distance = "", time = "", guidance = "")
         host?.clearRoute()
     }
 
     fun clearRouteAndDest() {
         host?.clearRoute()
         (host as? com.hellboy.tehrannav.MainActivity)?.clearDest()
-        state = state.copy(destName = "", distance = "", time = "", guidance = "", aiResult = "")
+        state = state.copy(destName = "", distance = "", time = "", guidance = "")
     }
 
     fun toast(msg: String) {

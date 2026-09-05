@@ -156,21 +156,11 @@ fun TehranNavApp(activity: MainActivity) {
                     }
                 }
 
-                // AI input bar (bottom when not navigating)
+                // نوار کوچک پخش موسیقی اولترادیو
                 if (!activity.navActive) {
-                    AiBar(
-                        vm = vm,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(10.dp)
-                    )
+                    MiniRadioBar(activity.radioPlayer, modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp))
                 } else {
-                    NavCard(
-                        vm, activity,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(12.dp)
-                    )
+                    NavCard(vm, activity, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
                 }
 
                 // destination info card above AI bar
@@ -184,7 +174,7 @@ fun TehranNavApp(activity: MainActivity) {
                 }
 
                 // loading indicator
-                if (state.searching || state.aiLoading) {
+                if (state.searching) {
                     Surface(
                         modifier = Modifier.align(Alignment.Center),
                         shape = RoundedCornerShape(12.dp),
@@ -195,14 +185,13 @@ fun TehranNavApp(activity: MainActivity) {
                             CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(12.dp))
                             Text(
-                                if (state.aiLoading) "در حال اتصال به هوش مصنوعی..." else "در حال جستجو...",
+                                "در حال جستجو...",
                                 color = Color(0xFF333333)
                             )
                         }
                     }
                 }
 
-                if (state.showSettings) SettingsDialog(vm, activity)
                 if (state.showOffline) OfflineDialog(vm, activity)
                 if (state.showCoords) CoordsDialog(vm, activity)
             }
@@ -226,23 +215,9 @@ private fun HamburgerMenu(vm: TehranNavViewModel, activity: MainActivity) {
         MenuRow(Icons.Default.Place, "مختصات موقعیت") { vm.setShowCoords(true); activity.closeDrawer() }
         MenuRow(Icons.Default.Navigation, "مرکز روی GPS") { activity.centerOnMyLocation(); activity.closeDrawer() }
         MenuRow(Icons.Default.Nightlight, "حالت شب") { activity.toggleNight(); activity.closeDrawer() }
-        MenuRow(Icons.Default.Settings, "تنظیمات AI") { vm.setShowSettings(true); activity.closeDrawer() }
-        if (vm.settings.geminiApiKey.isNullOrBlank()) {
-            Text(
-                "💡 بدون هوش مصنوعی هم می‌توانید مسیریابی کنید — فقط نام مقصد را بنویسید.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
-                modifier = Modifier.padding(top = 12.dp)
-            )
-        } else {
-            Text(
-                "🤖 هوش مصنوعی متصل است",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF2E7D32),
-                modifier = Modifier.padding(top = 12.dp)
-            )
-        }
-    }
+        MenuRow(Icons.Default.Settings, "تنظیمات برنامه") { activity.closeDrawer() }
+        Text("مسیریابی بدون کلید API و بدون حساب کاربری", style = MaterialTheme.typography.bodySmall, color = Color.Gray, modifier = Modifier.padding(top = 12.dp))
+    }    }
 }
 
 @Composable
@@ -322,43 +297,7 @@ private fun SearchBar(vm: TehranNavViewModel, activity: MainActivity, modifier: 
 //  PART 4: AI bar + dest card + nav card
 // ============================================================
 
-@Composable
-private fun AiBar(vm: TehranNavViewModel, modifier: Modifier = Modifier) {
-    val state = vm.state
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        shadowElevation = 8.dp,
-        color = Color.White
-    ) {
-        Row(
-            Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.SmartToy, null, tint = Color(0xFF7B1FA2))
-            Spacer(Modifier.width(8.dp))
-            OutlinedTextField(
-                value = state.aiQuery,
-                onValueChange = { vm.onAiType(it) },
-                placeholder = { Text("از AI بپرسید: «برو میدان آزادی»...") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent
-                )
-            )
-            IconButton(onClick = { vm.sendAiCommand(state.aiQuery) }) {
-                Icon(Icons.Default.Navigation, "ارسال", tint = Color(0xFF7B1FA2))
-            }
-            Text(
-                if (vm.settings.geminiApiKey.isNullOrBlank()) "AI: خاموش" else "AI: متصل",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (vm.settings.geminiApiKey.isNullOrBlank()) Color.Gray else Color(0xFF2E7D32)
-            )
-        }
-    }
-}// ============================================================
+// ============================================================
 //  PART 5: DestInfoCard + NavCard + dialogs
 // ============================================================
 
@@ -457,42 +396,6 @@ private fun NavCard(vm: TehranNavViewModel, activity: MainActivity, modifier: Mo
 // ============================================================
 
 @Composable
-private fun SettingsDialog(vm: TehranNavViewModel, activity: MainActivity) {
-    val key = remember { mutableStateOf(vm.settings.geminiApiKey) }
-    AlertDialog(
-        onDismissRequest = { vm.setShowSettings(false) },
-        title = { Text("تنظیمات هوش مصنوعی") },
-        text = {
-            Column {
-                Text("کلید API جمینی (از aistudio.google.com/app/apikey بگیرید):")
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = key.value,
-                    onValueChange = { key.value = it },
-                    singleLine = true,
-                    placeholder = { Text("AIza...") }
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "بدون کلید هم مسیریابی بدون AI کار می‌کند.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                vm.saveApiKey(key.value)
-                vm.setShowSettings(false)
-            }) { Text("ذخیره") }
-        },
-        dismissButton = {
-            TextButton(onClick = { vm.setShowSettings(false) }) { Text("بستن") }
-        }
-    )
-}
-
-@Composable
 private fun OfflineDialog(vm: TehranNavViewModel, activity: MainActivity) {
     AlertDialog(
         onDismissRequest = { vm.setShowOffline(false) },
@@ -583,4 +486,42 @@ private class ActivityHost(private val activity: MainActivity) : TehranNavViewMo
     override fun speak(text: String) = activity.speak(text)
     override fun hasLocation() = activity.hasLocation()
     override fun ensurePermissions() = activity.ensurePermissions()
+}
+
+
+private val radioStations = listOf(
+    "پاپ خارجی" to "https://radio.9craft.ir:7443/pop",
+    "پاپ و دنس" to "https://radio.9craft.ir:7443/pop2",
+    "لوفای" to "https://radio.9craft.ir:7443/lofi",
+    "فارسی قدیمی" to "https://radio.9craft.ir:7443/persian",
+    "رپ فارسی" to "https://radio.9craft.ir:7443/prap",
+    "راک و متال" to "https://radio.9craft.ir:7443/rock"
+)
+
+@Composable
+private fun MiniRadioBar(player: androidx.media3.common.Player?, modifier: Modifier = Modifier) {
+    var index by remember { mutableStateOf(0) }
+    var playing by remember { mutableStateOf(false) }
+    DisposableEffect(player) {
+        val listener = object : androidx.media3.common.Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
+        }
+        player?.addListener(listener)
+        onDispose { player?.removeListener(listener) }
+    }
+    fun play(i: Int) {
+        index = (i + radioStations.size) % radioStations.size
+        player?.setMediaItem(androidx.media3.common.MediaItem.fromUri(radioStations[index].second))
+        player?.prepare(); player?.play()
+    }
+    Surface(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), shadowElevation = 7.dp, color = Color.White) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Radio, null, tint = Color(0xFFFF6F00), modifier = Modifier.size(21.dp))
+            Spacer(Modifier.width(7.dp))
+            Text(radioStations[index].first, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
+            IconButton(onClick = { play(index - 1) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.SkipPrevious, "قبلی") }
+            IconButton(onClick = { if (player?.mediaItemCount == 0) play(index) else if (playing) player.pause() else player.play() }, modifier = Modifier.size(34.dp)) { Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, "پخش") }
+            IconButton(onClick = { play(index + 1) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.SkipNext, "بعدی") }
+        }
+    }
 }

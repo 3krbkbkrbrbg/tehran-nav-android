@@ -74,6 +74,10 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.kotlinx.coroutines.android)
 
+    // Ultradio background playback
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.session)
+
     implementation(libs.org.osmdroid.android)
     implementation(libs.org.osmdroid.mapsforge)
     implementation(libs.com.squareup.okhttp3.okhttp)
