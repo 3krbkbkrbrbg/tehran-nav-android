@@ -17,6 +17,10 @@ import com.hellboy.tehrannav.ui.TehranNavApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import android.widget.Toast
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
@@ -129,7 +133,7 @@ class MainActivity : ComponentActivity() {
             setMultiTouchControls(true)
             minZoomLevel = 3.0
             maxZoomLevel = 19.0
-            controller.setZoom(6.0)
+            controller.setZoom(6)
             controller.setCenter(GeoPoint(32.4279, 53.6880)) // center of Iran
         }
 
@@ -167,15 +171,15 @@ class MainActivity : ComponentActivity() {
 
     fun nightOn() = nightMode
 
-    fun openDrawer() { drawerState.open() }
-    fun closeDrawer() { drawerState.close() }
+    fun openDrawer() { CoroutineScope(Dispatchers.Main).launch { drawerState.open() } }
+    fun closeDrawer() { CoroutineScope(Dispatchers.Main).launch { drawerState.close() } }
 
     fun copyReadout() {
         val c = coordReadout
         if (c.isNotEmpty()) {
             val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText("coords", c))
-            android.widget.Toast.makeText(this, "کپی شد", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "کپی شد", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -184,7 +188,7 @@ class MainActivity : ComponentActivity() {
         val s = "%.6f, %.6f".format(loc.latitude, loc.longitude)
         val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
         cm.setPrimaryClip(android.content.ClipData.newPlainText("coords", s))
-        android.widget.Toast.makeText(this, "کپی شد: $s", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "کپی شد: $s", Toast.LENGTH_LONG).show()
     }
 
     fun centerOnMyLocation() {

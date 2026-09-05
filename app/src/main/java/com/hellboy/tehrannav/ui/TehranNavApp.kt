@@ -17,7 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.DrawerValue
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
@@ -68,6 +68,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hellboy.tehrannav.MainActivity
+import com.hellboy.tehrannav.nav.Route
 import kotlinx.coroutines.delay
 
 // ============================================================
@@ -362,7 +363,7 @@ private fun AiBar(vm: TehranNavViewModel, modifier: Modifier = Modifier) {
 // ============================================================
 
 @Composable
-private fun DestInfoCard(vm: TehranNavViewModel, state: TehranNavState, modifier: Modifier = Modifier) {
+private fun DestInfoCard(vm: TehranNavViewModel, state: UiState, activity: MainActivity, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -390,17 +391,17 @@ private fun DestInfoCard(vm: TehranNavViewModel, state: TehranNavState, modifier
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5))
                 ) { Icon(Icons.Default.Navigation, null); Spacer(Modifier.width(6.dp)); Text("شروع ناوبری") }
                 Spacer(Modifier.width(8.dp))
-                OutlinedButtonGm(vm, state)
+                OutlinedButtonGm(activity, state)
             }
         }
     }
 }
 
 @Composable
-private fun OutlinedButtonGm(vm: TehranNavViewModel, state: TehranNavState) {
+private fun OutlinedButtonGm(activity: MainActivity, state: UiState) {
     androidx.compose.material3.OutlinedButton(onClick = {
         if (state.destLat != 0.0) {
-            (vm.host as? MainActivity)?.openInGoogleMaps(state.destLat, state.destLon, state.destName)
+            activity.openInGoogleMaps(state.destLat, state.destLon, state.destName)
         }
     }) {
         Icon(Icons.Default.OpenInNew, null); Spacer(Modifier.width(6.dp)); Text("گوگل مپ")
@@ -568,4 +569,18 @@ private fun CoordsDialog(vm: TehranNavViewModel, activity: MainActivity) {
         },
         dismissButton = { TextButton(onClick = { vm.setShowCoords(false) }) { Text("بستن") } }
     )
+}
+private class ActivityHost(private val activity: MainActivity) : TehranNavViewModel.MapHost {
+    override fun currentLocation() = activity.currentLocation()
+    override fun drawRoute(route: Route) = activity.drawRoute(route)
+    override fun zoomToRoute(route: Route) = activity.zoomToRoute(route)
+    override fun placeDestMarker(lat: Double, lon: Double, name: String) =
+        activity.placeDestMarker(lat, lon, name)
+    override fun clearRoute() = activity.clearRoute()
+    override fun goTo(lat: Double, lon: Double) = activity.goTo(lat, lon)
+    override fun startNav() = activity.startNav()
+    override fun stopNav() = activity.stopNav()
+    override fun speak(text: String) = activity.speak(text)
+    override fun hasLocation() = activity.hasLocation()
+    override fun ensurePermissions() = activity.ensurePermissions()
 }
