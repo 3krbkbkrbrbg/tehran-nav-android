@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
         map = MapView(this).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
-            isMultiTouchGesturesEnabled = true
+            setMultiTouchControls(true)
             minZoomLevel = 4.0
             maxZoomLevel = 19.0
             controller.setZoom(12.5)
