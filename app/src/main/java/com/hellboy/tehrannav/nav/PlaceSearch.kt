@@ -1,9 +1,8 @@
 package com.hellboy.tehrannav.nav
 
-import com.hellboy.tehrannav.data.GeocodeFeature
-import com.hellboy.tehrannav.data.GeocodeResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import okhttp3.OkHttpClient
@@ -11,8 +10,15 @@ import okhttp3.Request
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
-/** Place search + reverse geocoding via Nominatim (OpenStreetMap). */
+/**
+ * جست‌وجوی آدرس در سراسر ایران و تبدیل مختصات به نشانی فارسی.
+ * منبع فعلی Nominatim/OpenStreetMap است و به API Key نیاز ندارد.
+ * برای رعایت محدودیت سرویس عمومی، UI درخواست‌ها را debounce می‌کند.
+ */
 object PlaceSearch {
+
+    private const val BASE_URL = "https://nominatim.openstreetmap.org"
+    private const val USER_AGENT = "TehranNav/2.0 (OpenStreetMap navigation app)"
 
     private val json = Json { ignoreUnknownKeys = true }
     private val client = OkHttpClient.Builder()
@@ -20,49 +26,83 @@ object PlaceSearch {
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    data class Place(val name: String, val lat: Double, val lon: Double)
+    @Serializable
+    private data class SearchItem(
+        val lat: String = "",
+        val lon: String = "",
+        val display_name: String = "",
+        val name: String = "",
+        val type: String = "",
+        val category: String = ""
+    )
 
-    /** Forward geocode a Persian/English query, bias toward Tehran. */
-    suspend fun search(query: String): List<Place> = withContext(Dispatchers.IO) {
-        if (query.isBlank()) return@withContext emptyList()
+    data class Place(
+        val name: String,
+        val lat: Double,
+        val lon: Double,
+        val subtitle: String = "",
+        val type: String = ""
+    )
+
+    /** جست‌وجوی آدرس، مکان، خیابان یا کسب‌وکار در کل محدوده کشور ایران. */
+    suspend fun search(query: String, limit: Int = 8): List<Place> = withContext(Dispatchers.IO) {
+        val normalized = normalize(query)
+        if (normalized.length < 2) return@withContext emptyList()
+
         runCatching {
-            val q = URLEncoder.encode(query, "UTF-8")
-            val url = "https://nominatim.openstreetmap.org/search?q=$q&format=jsonv2&limit=8&accept-language=fa&viewbox=51.0,35.9,51.7,35.5&bounded=1&countrycodes=ir"
-            val req = Request.Builder()
+            val q = URLEncoder.encode(normalized, "UTF-8")
+            val url = "$BASE_URL/search" +
+                "?q=$q&format=jsonv2&addressdetails=1&dedupe=1" +
+                "&limit=${limit.coerceIn(1, 10)}&accept-language=fa&countrycodes=ir"
+            val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "TehranNav/1.0 (contact: hellboy)")
+                .header("User-Agent", USER_AGENT)
+                .header("Accept", "application/json")
                 .build()
-            client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@use emptyList()
-                val body = resp.body?.string().orEmpty()
-                val parsed = json.decodeFromString<List<GeocodeFeature>>(body)
-                parsed.mapNotNull { f ->
-                    val c = f.geometry?.coordinates
-                    if (c == null || c.size < 2) return@mapNotNull null
-                    val name = buildString {
-                        append(f.properties.name.ifBlank { f.properties.street ?: "مکان" })
-                        val district = f.properties.district ?: f.properties.city ?: f.properties.locality
-                        if (!district.isNullOrBlank()) append(" — $district")
-                        if (!f.properties.country.isNullOrBlank()) append(" (${f.properties.country})")
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use emptyList()
+                val body = response.body?.string().orEmpty()
+                json.decodeFromString<List<SearchItem>>(body).mapNotNull { item ->
+                    val lat = item.lat.toDoubleOrNull() ?: return@mapNotNull null
+                    val lon = item.lon.toDoubleOrNull() ?: return@mapNotNull null
+                    val full = item.display_name.trim()
+                    val title = item.name.trim().ifBlank {
+                        full.substringBefore(",").trim().ifBlank { "مکان انتخاب‌شده" }
                     }
-                    Place(name, c[1], c[0])
-                }
+                    val subtitle = full.removePrefix(title).trim().trimStart(',', '،', ' ')
+                    Place(title, lat, lon, subtitle, item.type.ifBlank { item.category })
+                }.distinctBy { "%.5f,%.5f".format(it.lat, it.lon) }
             }
         }.getOrDefault(emptyList())
     }
 
-    /** Reverse geocode current GPS position → address text (Persian). */
+    /** تبدیل مختصات فعلی به نشانی فارسی برای نمایش به‌عنوان مبدأ. */
     suspend fun reverse(lat: Double, lon: Double): String = withContext(Dispatchers.IO) {
         runCatching {
-            val url = "https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lon&format=jsonv2&accept-language=fa"
-            val req = Request.Builder().url(url).header("User-Agent", "TehranNav/1.0").build()
-            client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@use ""
-                val body = resp.body?.string().orEmpty()
-                // extract display_name only — no need for full model
-                val p = json.parseToJsonElement(body).jsonObject
-                p["display_name"]?.toString()?.trim('"') ?: ""
+            val url = "$BASE_URL/reverse?lat=$lat&lon=$lon&format=jsonv2" +
+                "&addressdetails=1&accept-language=fa"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", USER_AGENT)
+                .header("Accept", "application/json")
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use ""
+                val body = response.body?.string().orEmpty()
+                json.parseToJsonElement(body).jsonObject["display_name"]
+                    ?.toString()?.trim('"') ?: ""
             }
         }.getOrDefault("")
     }
+
+    /** یکسان‌سازی حروف فارسی/عربی برای جست‌وجوی دقیق‌تر. */
+    private fun normalize(value: String): String = value
+        .replace('ي', 'ی')
+        .replace('ى', 'ی')
+        .replace('ك', 'ک')
+        .replace('ۀ', 'ه')
+        .replace('\u200c', ' ')
+        .replace(Regex("\\s+"), " ")
+        .trim()
 }

@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -246,58 +247,133 @@ private fun MenuRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label
 @Composable
 private fun SearchBar(vm: TehranNavViewModel, activity: MainActivity, modifier: Modifier = Modifier) {
     val state = vm.state
-    Surface(
-        modifier = modifier.fillMaxWidth().padding(end = 8.dp),
-        shape = RoundedCornerShape(28.dp),
-        shadowElevation = 6.dp,
-        color = Color.White
-    ) {
-        Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.Search, null, tint = Color.Gray)
-            Spacer(Modifier.width(6.dp))
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = { vm.onSearchType(it) },
-                placeholder = { Text("کجا می‌روید؟...") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent
-                )
-            )
-            IconButton(onClick = { vm.search(state.searchQuery) }) {
-                Icon(Icons.Default.Place, "جستجو", tint = Color(0xFFFF6F00))
-            }
-        }
-    }
-
-    if (state.searchResults.isNotEmpty()) {
+    Column(modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
         Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(300.dp),
-            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(22.dp),
             shadowElevation = 8.dp,
             color = Color.White
         ) {
-            LazyColumn {
-                items(state.searchResults) { place ->
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .clickable { vm.pickDestination(place.name, place.lat, place.lon) }
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Place, null, tint = Color(0xFFFF6F00))
-                        Spacer(Modifier.width(10.dp))
-                        Text(place.name, fontWeight = FontWeight.Medium, color = Color(0xFF222222))
+            Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                SearchFieldRow(
+                    label = "مبدأ",
+                    value = state.originQuery.ifBlank { state.originName },
+                    placeholder = "موقعیت فعلی",
+                    active = state.searchTarget == SearchTarget.ORIGIN,
+                    onActivate = { vm.selectTarget(SearchTarget.ORIGIN) },
+                    onValueChange = { vm.onSearchType(it) },
+                    leading = Icons.Default.MyLocation,
+                    onClear = { vm.useCurrentLocationAsOrigin() }
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.width(20.dp))
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.width(1.dp).height(14.dp).background(Color(0xFFE2E2E2))
+                    )
+                    Spacer(Modifier.width(20.dp))
+                    IconButton(onClick = { vm.swapOriginDestination() }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.SwapVert, "جابجایی مبدأ و مقصد", tint = Color(0xFF1976D2))
+                    }
+                    Text("مبدأ و مقصد را انتخاب کنید", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                }
+                SearchFieldRow(
+                    label = "مقصد",
+                    value = state.destinationQuery.ifBlank { state.destName },
+                    placeholder = "کجا می‌خواهید بروید؟",
+                    active = state.searchTarget == SearchTarget.DESTINATION,
+                    onActivate = { vm.selectTarget(SearchTarget.DESTINATION) },
+                    onValueChange = { vm.onSearchType(it) },
+                    leading = Icons.Default.Search,
+                    onClear = { vm.clearRouteAndDest() }
+                )
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth().padding(top = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            QuickSearchChip("پمپ بنزین", "پمپ بنزین", vm, Modifier.weight(1f))
+            QuickSearchChip("رستوران", "رستوران", vm, Modifier.weight(1f))
+            QuickSearchChip("پارکینگ", "پارکینگ", vm, Modifier.weight(1f))
+        }
+
+        if (state.searchResults.isNotEmpty()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(top = 7.dp).heightIn(max = 310.dp),
+                shape = RoundedCornerShape(18.dp),
+                shadowElevation = 10.dp,
+                color = Color.White
+            ) {
+                LazyColumn {
+                    items(state.searchResults) { place ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { vm.pickPlace(place) }.padding(13.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(Icons.Default.Place, null, tint = Color(0xFF1976D2), modifier = Modifier.padding(top = 2.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(place.name, fontWeight = FontWeight.SemiBold, color = Color(0xFF202124))
+                                if (place.subtitle.isNotBlank()) {
+                                    Text(place.subtitle, color = Color.Gray, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                            Text("انتخاب", color = Color(0xFF1976D2), style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SearchFieldRow(
+    label: String,
+    value: String,
+    placeholder: String,
+    active: Boolean,
+    onActivate: () -> Unit,
+    onValueChange: (String) -> Unit,
+    leading: androidx.compose.ui.graphics.vector.ImageVector,
+    onClear: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(leading, null, tint = if (active) Color(0xFF1976D2) else Color.Gray, modifier = Modifier.size(21.dp))
+        Spacer(Modifier.width(9.dp))
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = { Text(placeholder) },
+            label = { Text(label) },
+            singleLine = true,
+            modifier = Modifier.weight(1f).clickable(onClick = onActivate),
+            textStyle = MaterialTheme.typography.bodyMedium,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF1976D2),
+                unfocusedBorderColor = Color.Transparent,
+                focusedContainerColor = Color(0xFFF7F9FC),
+                unfocusedContainerColor = Color.Transparent
+            )
+        )
+        IconButton(onClick = onClear, modifier = Modifier.size(34.dp)) {
+            Icon(Icons.Default.Close, "پاک کردن", tint = Color.Gray)
+        }
+    }
+}
+
+@Composable
+private fun QuickSearchChip(label: String, query: String, vm: TehranNavViewModel, modifier: Modifier = Modifier) {
+    androidx.compose.material3.AssistChip(
+        onClick = {
+            vm.selectTarget(SearchTarget.DESTINATION)
+            vm.onSearchType(query)
+        },
+        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        modifier = modifier,
+        leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(16.dp)) }
+    )
 }
 
 // ============================================================
