@@ -28,7 +28,12 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SmartToy
@@ -54,7 +59,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.onDispose
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +73,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hellboy.tehrannav.MainActivity
 import com.hellboy.tehrannav.nav.Route
@@ -217,7 +225,7 @@ private fun HamburgerMenu(vm: TehranNavViewModel, activity: MainActivity) {
         MenuRow(Icons.Default.Nightlight, "حالت شب") { activity.toggleNight(); activity.closeDrawer() }
         MenuRow(Icons.Default.Settings, "تنظیمات برنامه") { activity.closeDrawer() }
         Text("مسیریابی بدون کلید API و بدون حساب کاربری", style = MaterialTheme.typography.bodySmall, color = Color.Gray, modifier = Modifier.padding(top = 12.dp))
-    }    }
+    }
 }
 
 @Composable
@@ -520,7 +528,7 @@ private fun MiniRadioBar(player: androidx.media3.common.Player?, modifier: Modif
             Spacer(Modifier.width(7.dp))
             Text(radioStations[index].first, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
             IconButton(onClick = { play(index - 1) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.SkipPrevious, "قبلی") }
-            IconButton(onClick = { if (player?.mediaItemCount == 0) play(index) else if (playing) player.pause() else player.play() }, modifier = Modifier.size(34.dp)) { Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, "پخش") }
+            IconButton(onClick = { if (player?.mediaItemCount == 0) play(index) else if (playing) player?.pause() else player?.play() }, modifier = Modifier.size(34.dp)) { Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, "پخش") }
             IconButton(onClick = { play(index + 1) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.SkipNext, "بعدی") }
         }
     }
