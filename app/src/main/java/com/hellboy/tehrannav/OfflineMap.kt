@@ -34,6 +34,7 @@ class OfflineMap(
                 manager.downloadAreaAsync(
                     ctx, bbox, minZ, maxZ,
                     object : CacheManager.CacheManagerCallback {
+                        override fun downloadStarted() {}
                         override fun updateProgress(progress: Int, currentZoomLevel: Int, zoomMin: Int, zoomMax: Int) {
                             listener?.onProgress(progress, total)
                         }
