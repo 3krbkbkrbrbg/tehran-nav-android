@@ -31,7 +31,9 @@ data class UiState(
     val distance: String = "",
     val time: String = "",
     val guidance: String = "",
-    val showSettings: Boolean = false
+    val showSettings: Boolean = false,
+    val showOffline: Boolean = false,
+    val showCoords: Boolean = false
 )
 
 class TehranNavViewModel(app: Application) : AndroidViewModel(app) {
@@ -81,6 +83,14 @@ class TehranNavViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setShowSettings(v: Boolean) {
         state = state.copy(showSettings = v)
+    }
+
+    fun setShowOffline(v: Boolean) {
+        state = state.copy(showOffline = v)
+    }
+
+    fun setShowCoords(v: Boolean) {
+        state = state.copy(showCoords = v)
     }
 
     fun onAiType(q: String) {

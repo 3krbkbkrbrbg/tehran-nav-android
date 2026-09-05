@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
@@ -47,7 +48,8 @@ class MainActivity : ComponentActivity() {
         private set
     var navActive = false
         private set
-    private var nightMode = false
+    private var nightMode by androidx.compose.runtime.mutableStateOf(false)
+    val nightModeState: Boolean get() = nightMode
 
     /** shared with UI */
     var uiDestName = ""
@@ -61,6 +63,15 @@ class MainActivity : ComponentActivity() {
     var navGuidance = ""
         private set
 
+    // == UI state shared with Compose ==
+    val drawerState = androidx.compose.material3.DrawerValue.Closed.let { _ ->
+        androidx.compose.material3.DrawerState(androidx.compose.material3.DrawerValue.Closed)
+    }
+    var coordReadout by androidx.compose.runtime.mutableStateOf("")
+    var downloadProgress by androidx.compose.runtime.mutableStateOf("")
+    var lastLocation: GeoPoint? = null
+        private set
+
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
@@ -70,6 +81,9 @@ class MainActivity : ComponentActivity() {
         Configuration.getInstance().load(this, getSharedPreferences("osmdroid", MODE_PRIVATE))
         Configuration.getInstance().userAgentValue = packageName
         speaker = Speaker(this)
+
+        // ask for location right away on every cold start (first install and each re-entry)
+        ensurePermissions()
 
         setContent {
             TehranNavApp(activity = this)
@@ -113,14 +127,27 @@ class MainActivity : ComponentActivity() {
             setTileSource(TileSourceFactory.MAPNIK)
             zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             setMultiTouchControls(true)
-            minZoomLevel = 4.0
+            minZoomLevel = 3.0
             maxZoomLevel = 19.0
-            controller.setZoom(12.5)
-            controller.setCenter(GeoPoint(35.6892, 51.3890))
+            controller.setZoom(6.0)
+            controller.setCenter(GeoPoint(32.4279, 53.6880)) // center of Iran
         }
 
         map.overlays.add(CompassOverlay(this, InternalCompassOrientationProvider(this), map).apply { enableCompass() })
         map.overlays.add(ScaleBarOverlay(map))
+
+        // tap anywhere on map -> show coordinates
+        map.overlays.add(object : org.osmdroid.views.overlay.Overlay() {
+            override fun onSingleTapConfirmed(e: android.view.MotionEvent?, mapView: MapView?): Boolean {
+                if (e != null) {
+                    val p = mapView?.projection?.fromPixels(e.x.toDouble(), e.y.toDouble())
+                    if (p != null) {
+                        coordReadout = "%.6f, %.6f".format(p.latitude, p.longitude)
+                    }
+                }
+                return true
+            }
+        })
 
         myLocationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(this), map).apply {
             map.overlays.add(this)
@@ -140,10 +167,53 @@ class MainActivity : ComponentActivity() {
 
     fun nightOn() = nightMode
 
+    fun openDrawer() { drawerState.open() }
+    fun closeDrawer() { drawerState.close() }
+
+    fun copyReadout() {
+        val c = coordReadout
+        if (c.isNotEmpty()) {
+            val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("coords", c))
+            android.widget.Toast.makeText(this, "کپی شد", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun copyLocation() {
+        val loc = myLocationOverlay?.myLocation ?: lastLocation ?: return
+        val s = "%.6f, %.6f".format(loc.latitude, loc.longitude)
+        val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("coords", s))
+        android.widget.Toast.makeText(this, "کپی شد: $s", Toast.LENGTH_LONG).show()
+    }
+
     fun centerOnMyLocation() {
         if (!hasLocation()) { ensurePermissions(); return }
         val loc = myLocationOverlay?.myLocation
         if (loc != null) map.controller.animateTo(loc, 17.0, 800L)
+    }
+
+    fun openInGoogleMaps(lat: Double, lon: Double, label: String) {
+        try {
+            val uri = "geo:$lat,$lon?q=$lat,$lon(${android.net.Uri.encode(label)})"
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(uri)))
+        } catch (e: Exception) {
+            // fallback to plain geo
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("geo:$lat,$lon")))
+            } catch (e2: Exception) {
+                // no handler
+            }
+        }
+    }
+
+    fun downloadOfflineFor(region: String, listener: OfflineMap.Listener?) {
+        val bbox = when (region) {
+            "iran" -> BoundingBox(39.8, 61.0, 24.0, 44.0)      // all Iran
+            "tehran" -> BoundingBox(35.9, 51.6, 35.5, 50.9)    // Tehran metro
+            else -> map.boundingBox
+        }
+        OfflineMap(this, map).downloadRegion(bbox, 5, 14, listener)
     }
 
     fun setDest(name: String, lat: Double, lon: Double) {
@@ -156,7 +226,11 @@ class MainActivity : ComponentActivity() {
         map.controller.animateTo(GeoPoint(lat, lon), 15.0, 1200L)
     }
 
-    fun currentLocation(): GeoPoint? = myLocationOverlay?.myLocation
+    fun currentLocation(): GeoPoint? {
+        val loc = myLocationOverlay?.myLocation ?: return lastLocation
+        lastLocation = loc
+        return loc
+    }
 
     fun drawRoute(route: Route) {
         routePolyline?.let { map.overlays.remove(it) }
